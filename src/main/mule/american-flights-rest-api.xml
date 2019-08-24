@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd">
+	
+	
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="53258798-5856-453f-924b-7b7a5d1bda71" >
+		<http:listener-connection host="0.0.0.0" port="${http.port}" />
+	</http:listener-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="a438c82e-a29d-4e5c-a423-cc35656d2cc8" >
+		<db:my-sql-connection host="${db.host}" port="${db.port}" user="${db.user}" password="${db.password}" database="${db.database}" />
+	</db:config>
+	<configuration-properties doc:name="Configuration properties" doc:id="99978fa8-85fa-4e8e-81ff-ae4385b9dba1" file="app-dev.properties" />
+	<flow name="getFlightsFlow" doc:id="03aff6c2-e9da-4799-b09e-0238879e881d" >
+		<http:listener doc:name="Listener" doc:id="2b6916f2-dbdf-4f6c-b8cc-cf62d7b85702" path="/flights" allowedMethods="GET" config-ref="HTTP_Listener_config">
+			<http:response statusCode="201" reasonPhrase="Created" >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	name : "Jagadeesh"
+}]]]></http:headers>
+			</http:response>
+		</http:listener>
+		<db:select doc:name="Select" doc:id="50973b40-505c-41a3-bfa6-54697fd49ce4" config-ref="Database_Config">
+			<db:sql >select * from american where toAirport = :dest</db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	dest: attributes.queryParams.destination
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="83f71137-eb11-4c59-9fdd-37f6b6c35d47" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	ID: payload01.ID,
+	code: (payload01.code1 default "") ++ (payload01.code2 default ""),
+	price: payload01.price default 0,
+	departureDate: payload01.takeOffDate default "",
+	origin: payload01.fromAirport default "",
+	destination: payload01.toAirport default "",
+	emptySeats: payload01.seatsAvailable default 0,
+	plane: {
+		"type": payload01.planeType default "",
+		totalSeats: payload01.totalSeats default 0
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="c16996e0-3956-4685-a503-61d6716a23ce" />
+	</flow>
+	<flow name="getFlightsByIDFlow" doc:id="a71f0704-a79e-446a-adf8-f5890a915966" >
+		<http:listener doc:name="Listener" doc:id="3782719a-cac4-4183-921d-89c0d9fdb53b" config-ref="HTTP_Listener_config" path="/flights/{ID}" allowedMethods="GET"/>
+		<db:select doc:name="Select" doc:id="5d52c770-0377-465b-af85-dace66f580f5" config-ref="Database_Config">
+			<db:sql >select * from american where ID = :FID</db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	FID: attributes.uriParams.ID
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="02a019a2-b702-4e50-8ae0-66d019cd660b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload map ( payload01 , indexOfPayload01 ) -> {
+	ID: payload01.ID,
+	code: (payload01.code1 default "") ++ (payload01.code2 default ""),
+	price: payload01.price default 0,
+	departureDate: payload01.takeOffDate default "",
+	origin: payload01.fromAirport default "",
+	destination: payload01.toAirport default "",
+	emptySeats: payload01.seatsAvailable default 0,
+	plane: {
+		"type": payload01.planeType default "",
+		totalSeats: payload01.totalSeats default 0
+	}
+})[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="deleteFlightsByIDFlow" doc:id="0509e977-9403-48f2-9cba-5cf683a03fb6" >
+		<http:listener doc:name="Listener" doc:id="5d68a58d-c94a-43b7-b87c-bcc6cf13d2e6" config-ref="HTTP_Listener_config" path="/flights/{ID}" allowedMethods="DELETE"/>
+		<db:delete doc:name="Delete" doc:id="6aac22f7-525a-4a53-ada4-fa7bbf3ae35b" config-ref="Database_Config">
+			<db:sql >delete from american where ID = :FID</db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	FID: attributes.uriParams.ID
+}]]]></db:input-parameters>
+		</db:delete>
+		<ee:transform doc:name="Transform Message" doc:id="b5615d9b-ab51-4ce1-a921-1c62b0c3597a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message: if(payload == 0)
+				"Flight is not deleted"
+			else
+				"Flight is deleted"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="postFlightsFlow" doc:id="45392ff2-c94b-4554-9d1a-279cbcd8a67d" >
+		<http:listener doc:name="Listener" doc:id="fc80709b-9450-40b7-ae7c-62b8a417ad3c" config-ref="HTTP_Listener_config" path="/flights" allowedMethods="POST">
+			<http:response statusCode="#[vars.status]" />
+			<http:error-response statusCode="#[vars.status]" >
+				<http:body ><![CDATA[#[payload]]]></http:body>
+			</http:error-response>
+		</http:listener>
+		<db:insert doc:name="Insert" doc:id="d76f6b4a-3dce-459c-80c5-4e2b1513af20" config-ref="Database_Config">
+			<db:sql>insert into american (ID,code1,code2,airlineName,toAirport,fromAirport,takeOffDate,price,planeType,seatsAvailable,totalSeats) values (:ID,:code1,:code2,:airlineName,:toAirport,:fromAirport,:takeOffDate,:price,:planeType,:seatsAvailable,:totalSeats)</db:sql>
+			<db:input-parameters><![CDATA[#[{
+    ID: payload.ID,
+    code1: payload.code1,
+    code2: payload.code2,
+    airlineName: payload.airlineName,
+    toAirport: payload.toAirport,
+    fromAirport: payload.fromAirport,
+    takeOffDate: payload.takeOffDate,
+    price: payload.price,
+    planeType: payload.planeType,
+    seatsAvailable: payload.seatsAvailable,
+    totalSeats: payload.totalSeats
+}]]]></db:input-parameters>
+		</db:insert>
+		<set-variable value="#[output application/java
+---
+if(payload.affectedRows == 0)
+	400
+else
+	201]" doc:name="Set Variable" doc:id="3d84c83e-b9b1-4bd4-a6b9-f349842abdd4" variableName="status" />
+		<ee:transform doc:name="Transform Message" doc:id="c1f05359-8118-4f26-8d33-dfc94c27b284" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message: if(payload.affectedRows == 0)
+				"Flight is not inserted" 
+			else
+				"Flight is inserted" 
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+
+	
+	
+	
+	
+	
+	
+</mule>
